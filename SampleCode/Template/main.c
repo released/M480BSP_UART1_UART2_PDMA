@@ -197,33 +197,6 @@ void  dump_buffer_hex(uint8_t *pucBuff, int nBytes)
     printf("\n");
 }
 
-// void UART2_RX_PDMA_set(void)
-// {
-//     //RX	
-//     PDMA_SetTransferCnt(PDMA,UART2_RX_DMA_CH, PDMA_WIDTH_8, DATA_NUM);
-//     PDMA_SetTransferAddr(PDMA,UART2_RX_DMA_CH, UART2_BASE, PDMA_SAR_FIX, ((uint32_t) (&UART2_RxBuffer[0])), PDMA_DAR_INC);	
-//     /* Set request source; set basic mode. */
-//     PDMA_SetTransferMode(PDMA,UART2_RX_DMA_CH, PDMA_UART2_RX, FALSE, 0);
-
-//     UART_PDMA_ENABLE(UART2,UART_INTEN_RXPDMAEN_Msk);
-//     PDMA_EnableInt(PDMA, UART2_RX_DMA_CH, PDMA_INT_TRANS_DONE);    
-//     PDMA_EnableInt(PDMA, UART2_RX_DMA_CH, PDMA_INT_TIMEOUT);        
-// }
-
-// void UART1_RX_PDMA_set(void)
-// {
-//     //RX	
-//     PDMA_SetTransferCnt(PDMA,UART1_RX_DMA_CH, PDMA_WIDTH_8, DATA_NUM);
-//     PDMA_SetTransferAddr(PDMA,UART1_RX_DMA_CH, UART1_BASE, PDMA_SAR_FIX, ((uint32_t) (&UART1_RxBuffer[0])), PDMA_DAR_INC);	
-//     /* Set request source; set basic mode. */
-//     PDMA_SetTransferMode(PDMA,UART1_RX_DMA_CH, PDMA_UART1_RX, FALSE, 0);
-
-//     UART_PDMA_ENABLE(UART1,UART_INTEN_RXPDMAEN_Msk);
-//     PDMA_EnableInt(PDMA, UART1_RX_DMA_CH, PDMA_INT_TRANS_DONE);   
-//     PDMA_EnableInt(PDMA, UART1_RX_DMA_CH, PDMA_INT_TIMEOUT);         
-// }
-
-
 void PDMA_IRQHandler(void)
 {
     uint32_t status = PDMA_GET_INT_STATUS(PDMA);
@@ -263,8 +236,6 @@ void PDMA_IRQHandler(void)
     }
     else if (status & PDMA_INTSTS_TDIF_Msk)     /* done */
     {
-		#if 1
-
         #if defined (ENABLE_UART1)            
         if (PDMA_GET_TD_STS(PDMA) & UART1_PDMA_OPENED_CH_RX)
         {
@@ -296,19 +267,7 @@ void PDMA_IRQHandler(void)
 			set_flag(flag_UART2_RX_end,ENABLE);
         } 
         #endif
-		
-		#else
-        if((PDMA_GET_TD_STS(PDMA) & UART_PDMA_OPENED_CH) == UART_PDMA_OPENED_CH)
-        {
-            /* Clear PDMA transfer done interrupt flag */
-            PDMA_CLR_TD_FLAG(PDMA, UART_PDMA_OPENED_CH);
-			//insert process
-			/*
-                DISABLE TRIGGER
-            */
 
-        } 
-		#endif
     }
     #if defined (ENABLE_UART1)     
     else if (status & (PDMA_INTSTS_REQTOF0_Msk))     /* Check the DMA time-out interrupt flag */
@@ -359,20 +318,15 @@ void UART1_UART2_Init(void)
     #if defined (ENABLE_UART1)     
     SYS_ResetModule(UART1_RST);
     UART_Open(UART1, 115200);
+    UART_PDMA_ENABLE(UART1,UART_INTEN_RXPDMAEN_Msk);    
     #endif
 
     #if defined (ENABLE_UART2)     
     SYS_ResetModule(UART2_RST);    
     UART_Open(UART2, 115200);
+    UART_PDMA_ENABLE(UART2,UART_INTEN_RXPDMAEN_Msk);    
     #endif
 
-    #if defined (ENABLE_UART1)
-    UART_PDMA_ENABLE(UART1,UART_INTEN_RXPDMAEN_Msk);
-    #endif
-
-    #if defined (ENABLE_UART2)     
-    UART_PDMA_ENABLE(UART2,UART_INTEN_RXPDMAEN_Msk);
-    #endif
 }
 
 void PDMA_WriteUART2SGTable(void)  //scatter-gather table */
@@ -448,90 +402,26 @@ void UART_PDMA_Init(void)
 	set_flag(flag_UART2_RX_end,DISABLE);
 
     SYS_ResetModule(PDMA_RST);
-
-    #if defined (ENABLE_UART1)    
-    PDMA_Open(PDMA, UART1_PDMA_OPENED_CH_RX);
-    #endif
-
-    #if defined (ENABLE_UART2)     
-    PDMA_Open(PDMA, UART2_PDMA_OPENED_CH_RX);
-    #endif
     
-    // UART1 RX
-    #if 1
-
     #if defined (ENABLE_UART1)    
+    PDMA_Open(PDMA, UART1_PDMA_OPENED_CH_RX);    
     PDMA_WriteUART1SGTable();
     PDMA_SetTransferMode(PDMA, UART1_RX_DMA_CH, PDMA_UART1_RX, TRUE, (uint32_t)&DMA_UART1DESC[UART1_RX_BUFFER01]);
+    PDMA_SetTimeOut(PDMA,UART1_RX_DMA_CH, ENABLE, PDMA_TIME);
+    PDMA_EnableInt(PDMA, UART1_RX_DMA_CH, PDMA_INT_TRANS_DONE);
+    PDMA_EnableInt(PDMA, UART1_RX_DMA_CH, PDMA_INT_TIMEOUT);   
     #endif
 
     #if defined (ENABLE_UART2)
+    PDMA_Open(PDMA, UART2_PDMA_OPENED_CH_RX);    
     PDMA_WriteUART2SGTable();
     PDMA_SetTransferMode(PDMA, UART2_RX_DMA_CH, PDMA_UART2_RX, TRUE, (uint32_t)&DMA_UART2DESC[UART2_RX_BUFFER01]);
-
-    #endif
-
-
-    #else
-    PDMA_SetTransferCnt(PDMA,UART1_RX_DMA_CH, PDMA_WIDTH_8, DATA_NUM);
-    /* Set source/destination address and attributes */
-    PDMA_SetTransferAddr(PDMA,UART1_RX_DMA_CH, UART1_BASE, PDMA_SAR_FIX, ((uint32_t) (&UART1_RxBuffer[0])), PDMA_DAR_INC);
-
-    /* Set request source; set basic mode. */
-    PDMA_SetTransferMode(PDMA,UART1_RX_DMA_CH, PDMA_UART1_RX, FALSE, 0);
-    /* Single request type. */
-    PDMA_SetBurstType(PDMA,UART1_RX_DMA_CH, PDMA_REQ_SINGLE, 0);
-    /* Disable table interrupt */
-    PDMA_DisableInt(PDMA,UART1_RX_DMA_CH, PDMA_INT_TEMPTY );//PDMA->DSCT[UART1_RX_DMA_CH].CTL |= PDMA_DSCT_CTL_TBINTDIS_Msk;
-
-    // UART2 RX	
-    PDMA_SetTransferCnt(PDMA,UART2_RX_DMA_CH, PDMA_WIDTH_8, DATA_NUM);
-    /* Set source/destination address and attributes */
-    PDMA_SetTransferAddr(PDMA,UART2_RX_DMA_CH, UART2_BASE, PDMA_SAR_FIX, ((uint32_t) (&UART2_RxBuffer[0])), PDMA_DAR_INC);
-    /* Set request source; set basic mode. */
-    PDMA_SetTransferMode(PDMA,UART2_RX_DMA_CH, PDMA_UART2_RX, FALSE, 0);
-    /* Single request type. */
-    PDMA_SetBurstType(PDMA,UART2_RX_DMA_CH, PDMA_REQ_SINGLE, 0);
-    /* Disable table interrupt */
-    PDMA_DisableInt(PDMA,UART2_RX_DMA_CH, PDMA_INT_TEMPTY );//PDMA->DSCT[UART2_RX_DMA_CH].CTL |= PDMA_DSCT_CTL_TBINTDIS_Msk;
-    #endif
-    /*
-        UART data freq : 1.6KHz	0.625	ms
-
-        Set PDMA CH 0/1 timeout to about 
-        2 ms (5/(72M/(2^15)))
-        0.56 ms (5/(72M/(2^13)))
-
-        target (ms)	    u32TimeOutCnt	clk div	    prescale	
-        2.275555556	    5	            72000000	32768	15      111
-        1.137777778	    5	            72000000	16384	14      110
-        0.568888889	    5	            72000000	8192	13      101
-        0.284444444	    5	            72000000	4096	12      100
-        0.142222222	    5	            72000000	2048	11      011
-        0.071111111	    5	            72000000	1024	10      010
-        0.035555556	    5	            72000000	512	    9       001
-        0.017777778	    5	            72000000	256	    8       000  
-
-    */
-    // PDMA->TOUTPSC = (PDMA->TOUTPSC & (~PDMA_TOUTPSC_TOUTPSC0_Msk)) | (0x5 << PDMA_TOUTPSC_TOUTPSC0_Pos);
-    PDMA_SetTimeOut(PDMA,UART1_RX_DMA_CH, ENABLE, PDMA_TIME );
-
-    #if defined (ENABLE_UART2) 
-    // PDMA->TOUTPSC = (PDMA->TOUTPSC & (~PDMA_TOUTPSC_TOUTPSC1_Msk)) | (0x5 << PDMA_TOUTPSC_TOUTPSC1_Pos);
-    PDMA_SetTimeOut(PDMA,UART2_RX_DMA_CH, ENABLE, PDMA_TIME );
-    #endif
-
-    // UART_PDMA_ENABLE(UART1,UART_INTEN_RXPDMAEN_Msk);
-    // UART_PDMA_ENABLE(UART2,UART_INTEN_RXPDMAEN_Msk);
-
-    PDMA_EnableInt(PDMA, UART1_RX_DMA_CH, PDMA_INT_TRANS_DONE);
-    PDMA_EnableInt(PDMA, UART1_RX_DMA_CH, PDMA_INT_TIMEOUT);
-    #if defined (ENABLE_UART2)    
+    PDMA_SetTimeOut(PDMA,UART2_RX_DMA_CH, ENABLE, PDMA_TIME);    
     PDMA_EnableInt(PDMA, UART2_RX_DMA_CH, PDMA_INT_TRANS_DONE);
     PDMA_EnableInt(PDMA, UART2_RX_DMA_CH, PDMA_INT_TIMEOUT);
     #endif
-    NVIC_EnableIRQ(PDMA_IRQn);
 
+    NVIC_EnableIRQ(PDMA_IRQn);
 }
 
 
@@ -586,26 +476,12 @@ void loop(void)
     if (is_flag_set(flag_UART1_RX_end))
     {
         set_flag(flag_UART1_RX_end, DISABLE);
-
-        // printf("UART1_RX : \r\n");
-
-        // dump_buffer_hex(UART1_RxBuffer,DATA_NUM);
-
-        // reset_buffer(UART1_RxBuffer,0x00,DATA_NUM);     
-        // UART1_RX_PDMA_set();   
         
     }
 
     if (is_flag_set(flag_UART2_RX_end))
     {
         set_flag(flag_UART2_RX_end, DISABLE);
-
-        // printf("UART2_RX : \r\n");
-
-        // dump_buffer_hex(UART2_RxBuffer,DATA_NUM);
-
-        // reset_buffer(UART2_RxBuffer,0x00,DATA_NUM);   
-        // UART2_RX_PDMA_set();   
         
     }
 }
